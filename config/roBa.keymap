@@ -1,3 +1,5 @@
+// Onishi / Keyball39 migration test. Layers 4-6, trackball and BLE controls kept from stock.
+// Layers 0-3 are a draft based on Remap screenshots. Do not flash until validated.
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/keys.h>
@@ -26,34 +28,7 @@
 };
 
 / {
-    combos {
-        compatible = "zmk,combos";
-
-        tab {
-            bindings = <&kp TAB>;
-            key-positions = <11 12>;
-        };
-
-        shift_tab {
-            bindings = <&kp LS(TAB)>;
-            key-positions = <12 13>;
-        };
-
-        muhennkann {
-            bindings = <&to_layer_0 INT_MUHENKAN>;
-            key-positions = <11 10>;
-        };
-
-        double_quotation {
-            bindings = <&kp DOUBLE_QUOTES>;
-            key-positions = <20 21>;
-        };
-
-        eq {
-            bindings = <&kp EQUAL>;
-            key-positions = <24 25>;
-        };
-    };
+    // Disabled stock position-based combos for the Onishi trial layout.
 
     macros {
         to_layer_0: to_layer_0 {
@@ -80,42 +55,39 @@
 
         default_layer {
             bindings = <
-&kp Q             &kp W         &kp E         &kp R                        &kp T                                                          &kp Y        &kp U  &lt 5 I    &kp O    &kp P
-&kp A             &kp S         &kp D         &kp F                        &kp G        &kp LS(LG(S))                      &kp MINUS      &kp K        &kp J  &kp K      &kp L    &kp SQT
-&mt LEFT_SHIFT Z  &kp X         &kp C         &kp V                        &kp B        &kp COLON                          &kp SEMICOLON  &kp N        &kp M  &kp COMMA  &kp DOT  &kp SLASH
-&kp LCTRL         &kp LEFT_WIN  &kp LEFT_ALT  &lt_to_layer_0 6 INT_HENKAN  &lt 2 SPACE  &lt_to_layer_0 3 INT_MUHENKAN      &kp BACKSPACE  &lt 1 ENTER                             &kp DEL
+                &kp Q  &kp L  &kp U  &kp COMMA  &kp DOT   &kp F  &kp W  &kp R  &kp Y  &kp P
+                &mt LCTRL E  &mt LGUI I  &mt LALT A  &mt LSHFT O  &kp MINUS  &trans  &trans  &mt LALT K  &mt LSHFT T  &mt LA(LGUI) N  &mt LGUI S  &mt LCTRL H
+                &kp Z  &kp X  &kp C  &kp V  &kp SEMICOLON  &trans  &trans  &kp G  &kp D  &kp M  &kp J  &lt 3 B
+                &kp LC(LS(T))  &kp LG(LS(NUMBER_5))  &mkp MB1  &lt 3 TAB  &lt 1 SPACE  &kp AT_SIGN  &kp ENTER  &lt 2 BACKSPACE  &kp CAPSLOCK
             >;
-
             sensor-bindings = <&inc_dec_kp PG_UP PAGE_DOWN>;
         };
 
-        FUNCTION {
+        NAV_NUM {
             bindings = <
-&trans  &trans  &trans  &trans  &trans                       &kp F1  &kp F2  &kp F3  &kp F4  &kp F5
-&trans  &trans  &trans  &trans  &trans  &trans      &kp F13  &kp F6  &kp F7  &kp F8  &kp F9  &kp F10
-&trans  &trans  &trans  &trans  &trans  &trans      &trans   &trans  &trans  &trans  &trans  &kp F11
-&trans  &trans  &trans  &trans  &trans  &trans      &trans   &trans                          &kp F12
+                &kp AT_SIGN  &kp LEFT_ARROW  &kp UP_ARROW  &kp RIGHT_ARROW  &kp SLASH  &kp ASTERISK  &kp KP_NUMBER_1  &kp KP_NUMBER_2  &kp KP_NUMBER_3  &kp DOUBLE_QUOTES
+                &kp DOLLAR  &kp LEFT_PARENTHESIS  &kp DOWN_ARROW  &kp RIGHT_PARENTHESIS  &kp BACKSPACE  &trans  &trans  &kp QUESTION  &kp KP_NUMBER_4  &kp KP_NUMBER_5  &kp KP_NUMBER_6  &kp KP_NUMBER_0
+                &kp LG(LS(NUMBER_5))  &kp C_VOLUME_DOWN  &kp C_MUTE  &kp C_VOLUME_UP  &kp ENTER  &trans  &trans  &kp EXCLAMATION  &kp KP_NUMBER_7  &kp KP_NUMBER_8  &kp KP_NUMBER_9  &kp SINGLE_QUOTE
+                &kp INT_RO  &kp EQUAL  &kp HASH  &trans  &trans  &trans  &to 2  &to 0  &kp F12
             >;
         };
 
-        NUM {
+        SYMBOLS {
             bindings = <
-&kp MINUS                   &kp KP_NUMBER_7  &kp KP_NUMBER_8  &kp KP_NUMBER_9  &kp PLUS                                                   &kp CARET         &kp AMPERSAND      &kp TILDE       &kp LEFT_PARENTHESIS  &kp RIGHT_PARENTHESIS
-&kp SLASH                   &kp KP_NUMBER_4  &kp KP_NUMBER_5  &kp KP_NUMBER_6  &kp ASTERISK  &kp LC(LA(KP_NUMBER_0))      &kp UNDERSCORE  &kp EXCLAMATION   &kp AT_SIGN        &kp HASH        &kp DOLLAR            &kp PERCENT
-&mt LEFT_SHIFT KP_NUMBER_0  &kp KP_NUMBER_1  &kp KP_NUMBER_2  &kp KP_NUMBER_3  &kp PERIOD    &kp EQUAL                    &trans          &kp LEFT_BRACKET  &kp RIGHT_BRACKET  &kp LEFT_BRACE  &kp RIGHT_BRACE       &kp BACKSLASH
-&trans                      &trans           &trans           &trans           &trans        &trans                       &trans          &trans                                                                     &kp PIPE
+                &kp HASH  &kp LEFT_BRACKET  &kp PIPE  &kp RIGHT_BRACKET  &kp EQUAL  &kp BACKSLASH  &kp LC(LEFT_ARROW)  &mkp MB3  &kp LC(RIGHT_ARROW)  &kp BACKSPACE
+                &kp TILDE  &kp LEFT_BRACE  &kp DOLLAR  &kp RIGHT_BRACE  &kp AMPERSAND  &trans  &trans  &kp GRAVE  &kp LANG1  &kp LANG2  &kp LC(RIGHT_ARROW)  &kp SINGLE_QUOTE
+                &kp QUESTION  &kp LESS_THAN  &kp PLUS  &kp GREATER_THAN  &kp PERCENT  &trans  &trans  &kp PIPE  &kp LEFT_ARROW  &kp DOWN_ARROW  &kp RIGHT_ARROW  &trans
+                &kp ESCAPE  &kp NUMBER_0  &kp DOT  &kp DELETE  &kp ENTER  &kp BACKSPACE  &trans  &trans  &trans
             >;
         };
 
-        ARROW {
+        UTIL {
             bindings = <
-&kp ESCAPE      &kp LC(LS(TAB))         &kp UP_ARROW    &kp LC(TAB)              &trans                       &trans  &trans  &trans  &trans  &trans
-&kp HOME        &kp LEFT_ARROW          &kp DOWN_ARROW  &kp RIGHT_ARROW          &kp END  &trans      &trans  &trans  &trans  &trans  &trans  &trans
-&kp LEFT_SHIFT  &kp LG(LS(LEFT_ARROW))  &trans          &kp LG(LS(RIGHT_ARROW))  &trans   &trans      &trans  &trans  &trans  &trans  &trans  &trans
-&trans          &trans                  &trans          &trans                   &trans   &trans      &trans  &trans                          &trans
+                &none  &kp LG(NUMBER_1)  &none  &kp LG(NUMBER_2)  &none  &none  &none  &none  &kp LG(LC(LS(PAGE_DOWN)))  &none
+                &none  &kp LEFT_GUI  &kp LEFT_ALT  &kp LEFT_SHIFT  &none  &trans  &trans  &kp F19  &mkp MB1  &mkp MB2  &kp LG(LC(LS(PAGE_UP)))  &none
+                &none  &none  &none  &none  &kp B  &trans  &trans  &kp ESCAPE  &kp LA(LG(NUMBER_6))  &kp LA(LG(MINUS))  &kp LA(LG(NUMBER_8))  &none
+                &none  &kp KP_NUMBER_0  &none  &trans  &kp LG(W)  &trans  &trans  &trans  &bootloader
             >;
-
-            sensor-bindings = <&inc_dec_kp LC(PAGE_UP) LC(PAGE_DOWN)>;
         };
 
         MOUSE {
