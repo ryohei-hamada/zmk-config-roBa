@@ -11,7 +11,7 @@
 };
 
 &trackball {
-    automouse-layer = <4>;
+    automouse-layer = <0>; // disable auto mouse, explicit Layer 3 only
     scroll-layers = <3 5>;
 
     // arrows {
