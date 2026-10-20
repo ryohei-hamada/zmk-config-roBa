@@ -1,3 +1,5 @@
+name: "roBa LP - ZMK Firmware"
+run-name: "roBa LP | ${{ github.ref_name }} | ${{ github.event.head_commit.message || github.event_name }}"
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
