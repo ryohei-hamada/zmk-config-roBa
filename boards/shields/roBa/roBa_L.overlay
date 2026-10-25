@@ -14,3 +14,17 @@
 &left_encoder {
     status = "okay";
 };
+
+// Diagnostic only: expose a CDC ACM console on the left half's USB port.
+/ {
+    chosen {
+        zephyr,console = &roba_left_diag_uart;
+        zephyr,shell-uart = &roba_left_diag_uart;
+    };
+};
+
+&zephyr_udc0 {
+    roba_left_diag_uart: roba_left_diag_uart {
+        compatible = "zephyr,cdc-acm-uart";
+    };
+};
