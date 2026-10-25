@@ -56,7 +56,7 @@
         default_layer {
             bindings = <
                 &kp Q  &kp L  &kp U  &kp COMMA  &kp DOT   &kp F  &kp W  &kp R  &kp Y  &kp P
-                &mt LCTRL E  &mt LGUI I  &mt LALT A  &mt LSHFT O  &kp MINUS  &kp F13  &kp F14  &mt LALT K  &mt LSHFT T  &mt LA(LGUI) N  &mt LGUI S  &mt LCTRL H
+                &mt LCTRL E  &mt LGUI I  &mt LALT A  &mt LSHFT O  &kp MINUS  &none  &kp F14  &mt LALT K  &mt LSHFT T  &mt LA(LGUI) N  &mt LGUI S  &mt LCTRL H
                 &kp Z  &kp X  &kp C  &kp V  &kp SEMICOLON  &trans  &trans  &kp G  &kp D  &kp M  &kp J  &lt 3 B
                 &kp LC(LS(T))  &kp LG(LS(NUMBER_5))  &mkp MB1  &lt 3 TAB  &lt 1 SPACE  &kp AT_SIGN  &kp ENTER  &lt 2 BACKSPACE  &kp CAPSLOCK
             >;
