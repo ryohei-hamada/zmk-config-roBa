@@ -45,7 +45,7 @@ int rs_load(rs_store *s,unsigned slot,unsigned bank,const rs_record *r) {
     if(slot>=RS_SLOTS||bank>1||!rs_valid(r,0))return -EINVAL;
     uint32_t gen=rs_u32(r->b+4),old=rs_u32(s->records[slot].b+4);
     if(gen>old){s->records[slot]=*r;s->banks[slot]=bank;}
-    else if(gen==old&&memcmp(r,&s->records[slot],sizeof(*r)))return -EUCLEAN;
+    else if(gen==old&&memcmp(r,&s->records[slot],sizeof(*r)))return -EIO;
     return 0;
 }
 int rs_commit(rs_store *s,unsigned slot,uint32_t expected,const rs_record *next,rs_persist persist,void *ctx) {
