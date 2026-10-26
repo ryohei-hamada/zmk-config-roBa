@@ -461,9 +461,9 @@ index 7b8dd60..c0412e6 100644
 +    bool
 +    default n
 +config ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_IDENTIFIER_MAX_LEN
-+    int
++    int "Custom subsystem identifier length"
 +    default 32
 +config ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_REQUEST_PAYLOAD_MAX_BYTES
-+    int
++    int "Custom subsystem payload length"
 +    default 256
 +endif

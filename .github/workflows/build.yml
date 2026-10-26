@@ -8,6 +8,8 @@ jobs:
     container: zmkfirmware/zmk-build-arm:stable
     steps:
       - uses: actions/checkout@v4
+      - name: Host storage and power-cut tests
+        run: python3 tests/runtime/run.py
       - name: Prepare pinned workspace
         run: |
           mkdir -p /tmp/roba-build/config

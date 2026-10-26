@@ -68,7 +68,7 @@ static int behavior_init(const struct device *dev) { return 0; }
 DT_INST_FOREACH_STATUS_OKAY(RS_INST)
 static int init_store(void) { rs_init(&store);return 0; }
 SYS_INIT(init_store,APPLICATION,CONFIG_APPLICATION_INIT_PRIORITY);
-static int settings_set(const char *name,size_t len,settings_read_cb read_cb,void *cb_arg) {
+static int rs_settings_set(const char *name,size_t len,settings_read_cb read_cb,void *cb_arg) {
     if(!name||strlen(name)!=3||name[0]<'0'||name[0]>'7'||name[1]!='/'||name[2]<'0'||name[2]>'1'||len!=RS_SIZE)return -EINVAL;
     rs_record record;
     if(read_cb(cb_arg,&record,sizeof(record))!=sizeof(record))return -EIO;
@@ -76,7 +76,7 @@ static int settings_set(const char *name,size_t len,settings_read_cb read_cb,voi
     if(!rs_valid(&record,0))return 0;
     return rs_load(&store,name[0]-'0',name[2]-'0',&record);
 }
-SETTINGS_STATIC_HANDLER_DEFINE(roba_runtime,"roba_runtime_v1",NULL,settings_set,NULL,NULL);
+SETTINGS_STATIC_HANDLER_DEFINE(roba_runtime,"roba_runtime_v1",NULL,rs_settings_set,NULL,NULL);
 static int persist(unsigned slot,unsigned bank,const rs_record *r,void *ctx) {
     char key[32];snprintk(key,sizeof(key),"roba_runtime_v1/%u/%u",slot,bank);
     return settings_save_one(key,r,sizeof(*r));
