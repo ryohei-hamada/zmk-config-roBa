@@ -1,7 +1,38 @@
-name: "roBa LP - ZMK Firmware"
-run-name: "roBa LP | ${{ github.ref_name }} | ${{ github.event.head_commit.message || github.event_name }}"
+name: roBa runtime macro firmware
 on: [push, pull_request, workflow_dispatch]
-
+permissions:
+  contents: read
 jobs:
-  build:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3-branch
+  right:
+    runs-on: ubuntu-latest
+    container: zmkfirmware/zmk-build-arm:stable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host storage and power-cut tests
+        run: python3 tests/runtime/run.py
+      - name: Prepare pinned workspace
+        run: |
+          mkdir -p /tmp/roba-build/config
+          cp -R config/* /tmp/roba-build/config/
+          cd /tmp/roba-build
+          west init -l config
+          west update --fetch-opt=--filter=tree:0
+          west zephyr-export
+          git -C zmk apply --check "$GITHUB_WORKSPACE/patches/custom-rpc-v0.3.patch"
+          git -C zmk apply "$GITHUB_WORKSPACE/patches/custom-rpc-v0.3.patch"
+      - name: Build right controller only
+        working-directory: /tmp/roba-build
+        run: west build -s zmk/app -d build -b seeeduino_xiao_ble -S studio-rpc-usb-uart -- -DSHIELD=roBa_R -DZMK_CONFIG=/tmp/roba-build/config -DZMK_EXTRA_MODULES="$GITHUB_WORKSPACE"
+      - name: Configuration evidence
+        if: always()
+        run: |
+          if test -f /tmp/roba-build/build/zephyr/.config; then cat /tmp/roba-build/build/zephyr/.config; fi
+          if test -f /tmp/roba-build/build/zephyr/zephyr.dts; then cat /tmp/roba-build/build/zephyr/zephyr.dts; fi
+      - name: Prepare artifact
+        run: |
+          mkdir artifacts
+          cp /tmp/roba-build/build/zephyr/zmk.uf2 artifacts/roBa_R-studio-runtime-0.5.0.uf2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-runtime-0.5.0
+          path: artifacts/

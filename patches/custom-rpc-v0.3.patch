@@ -1,0 +1,469 @@
+diff --git a/app/CMakeLists.txt b/app/CMakeLists.txt
+index 60c502f..4274e26 100644
+--- a/app/CMakeLists.txt
++++ b/app/CMakeLists.txt
+@@ -114,8 +114,10 @@ if (CONFIG_ZMK_STUDIO_RPC)
+ 
+   include(nanopb)
+ 
+-    # Turn off the default nanopb behavior
++  # Turn off the default nanopb behavior
+   set(NANOPB_GENERATE_CPP_STANDALONE OFF)
++  # Required if nanopb is included in other module
++  set(NANOPB_GENERATE_CPP_APPEND_PATH TRUE)
+ 
+   nanopb_generate_cpp(proto_srcs proto_hdrs RELPATH ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}
+                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/studio.proto
+@@ -123,6 +125,7 @@ if (CONFIG_ZMK_STUDIO_RPC)
+                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/core.proto
+                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/behaviors.proto
+                         ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/keymap.proto
++                        ${ZEPHYR_ZMK_STUDIO_MESSAGES_MODULE_DIR}/proto/zmk/custom.proto
+   )
+ 
+   target_include_directories(app PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+diff --git a/app/include/linker/zmk-rpc-custom-subsystems.ld b/app/include/linker/zmk-rpc-custom-subsystems.ld
+new file mode 100644
+index 0000000..39927f4
+--- /dev/null
++++ b/app/include/linker/zmk-rpc-custom-subsystems.ld
+@@ -0,0 +1,9 @@
++/*
++ * Copyright (c) 2026 The ZMK Contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++
++#include <zephyr/linker/linker-defs.h>
++
++ITERABLE_SECTION_ROM(zmk_rpc_custom_subsystem, 4)
+diff --git a/app/include/zmk/studio/custom.h b/app/include/zmk/studio/custom.h
+new file mode 100644
+index 0000000..f9033a4
+--- /dev/null
++++ b/app/include/zmk/studio/custom.h
+@@ -0,0 +1,144 @@
++/*
++ * Copyright (c) 2026 The ZMK Contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++
++#pragma once
++
++#include <proto/zmk/custom.pb.h>
++#include <zmk/event_manager.h>
++#include <zmk/studio/rpc.h>
++#include <zephyr/logging/log.h>
++
++struct zmk_studio_custom_notification {
++    uint8_t subsystem_index;
++    // callback to encode payload
++    // Note that as for now, encode is executed within raise_zmk_studio_custom_notification(...)
++    // caller can safely set pointer to local stack variable which remains until
++    // raise_zmk_studio_custom_notification(...) returns.
++    pb_callback_t encode_payload;
++};
++
++ZMK_EVENT_DECLARE(zmk_studio_custom_notification);
++
++/**
++ * Handler function which is called when a custom subsystem CallRequest is received.
++ * @param request The CallRequest received from the studio.
++ * @param encode_response pointer to CallResponse.payload's pb_callback_t.
++ * The handler should set this to a function which encodes the response.
++ *
++ * WARNING: The encoding can be called multiple times to calculate the size
++ * of the payload.
++ *
++ * WARNING: The encoding is executed after returning from this handler, so the pb_callback_t
++ * **cannot use pointer to local stack variables**. Pointer to data segment (global/static variable)
++ * or heap memory should be used. Instead of setting data pointer, the handler can also collect and
++ * build response in encoder function if the operation is light-weight and does not have side
++ * effects.
++ *
++ * NOTE: As for now, the handler is not called in parallel. Next RPC is always processed after
++ * sending response. So the handler can share single global variable as data buffer to use in
++ * encoder function.
++ *
++ * @return true if the request was handled successfully, false if failed.
++ */
++typedef bool(custom_subsystem_handler)(const zmk_custom_CallRequest *request,
++                                       pb_callback_t *encode_response);
++
++struct zmk_rpc_custom_subsystem_meta {
++    char **ui_urls;
++    size_t ui_urls_count;
++    enum zmk_studio_rpc_handler_security security;
++};
++
++struct zmk_rpc_custom_subsystem {
++    char *identifier;
++    struct zmk_rpc_custom_subsystem_meta *meta;
++    custom_subsystem_handler *handler;
++};
++
++/**
++ * Registers a custom RPC subsystem.
++ * @param _identifier Unique identifier string for the custom subsystem.
++ * @param _meta Pointer to zmk_rpc_custom_subsystem_meta struct defining metadata.
++ * @param _handler Function pointer to the handler function for CallRequests.
++ */
++#define ZMK_RPC_CUSTOM_SUBSYSTEM(_identifier, _meta, _handler)                                     \
++    BUILD_ASSERT(sizeof(#_identifier) < CONFIG_ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_IDENTIFIER_MAX_LEN, \
++                 "Identifier too long: " #_identifier);                                            \
++    static bool _handler(const zmk_custom_CallRequest *req, pb_callback_t *res);                   \
++    STRUCT_SECTION_ITERABLE(zmk_rpc_custom_subsystem, zmk_rpc_custom_subsystem_##_identifier) = {  \
++        .identifier = #_identifier,                                                                \
++        .meta = _meta,                                                                             \
++        .handler = _handler,                                                                       \
++    };
++
++/**
++ * Helper macro to define UI URLs array in zmk_rpc_custom_subsystem_meta.
++ * @param ... List of string literals representing UI URLs.
++ */
++#define ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS(...)                                                      \
++    .ui_urls = (char *[]){__VA_ARGS__},                                                            \
++    .ui_urls_count =                                                                               \
++        COND_CODE_1(IS_EMPTY(__VA_ARGS__), (0), (UTIL_INC(NUM_VA_ARGS_LESS_1(__VA_ARGS__))))
++
++/**
++ * Function to encode response payload for custom subsystems.
++ * Used in ZMK_RPC_CUSTOM_SUBSYSTEM_RESPONSE_BUFFER macro.
++ */
++bool zmk_rpc_custom_subsystem_encode_response_payload(pb_ostream_t *stream,
++                                                      const pb_field_t *payload_field,
++                                                      const pb_msgdesc_t *custom_response_msgdesc,
++                                                      void const *custom_response);
++
++/**
++ * Registers a custom RPC subsystem response buffer.
++ * @param _subsystem_identifier Unique identifier string for the custom subsystem.
++ * @param response_type The protobuf message type of the custom response.
++ * @note The response buffer is static and shared.
++ *       The encode function checks that the buffer is used only by one encoding at a time.
++ */
++#define ZMK_RPC_CUSTOM_SUBSYSTEM_RESPONSE_BUFFER(_subsystem_identifier, response_type)             \
++    /** bufer */                                                                                   \
++    static response_type zmk_rpc_custom_subsystem_response_buffer_##_subsystem_identifier;         \
++    /** sequence (pseudo) pointer for buffer usage tracking */                                     \
++    static void *zmk_rpc_custom_subsystem_response_buffer_seq_##_subsystem_identifier;             \
++                                                                                                   \
++    static inline bool zmk_rpc_custom_subsystem_encode_response_##_subsystem_identifier(           \
++        pb_ostream_t *stream, const pb_field_t *payload_field, void *const *arg) {                 \
++        const void *seq = (void *)*arg;                                                            \
++        if (seq != zmk_rpc_custom_subsystem_response_buffer_seq_##_subsystem_identifier) {         \
++            LOG_DBG("response buffer is in use by other request: expected=%d current=%d",          \
++                    (int)seq,                                                                      \
++                    (int)zmk_rpc_custom_subsystem_response_buffer_seq_##_subsystem_identifier);    \
++            return false; /* buffer was used by others before encoding */                          \
++        }                                                                                          \
++        return zmk_rpc_custom_subsystem_encode_response_payload(                                   \
++            stream, payload_field, response_type##_fields,                                         \
++            &zmk_rpc_custom_subsystem_response_buffer_##_subsystem_identifier);                    \
++        /* NOTE: buffer cannot be released here because encode can be called multiple times */     \
++    }                                                                                              \
++    static inline response_type                                                                    \
++        *zmk_rpc_custom_subsystem_response_buffer_allocate_##_subsystem_identifier(                \
++            pb_callback_t *encode_response) {                                                      \
++        zmk_rpc_custom_subsystem_response_buffer_##_subsystem_identifier =                         \
++            (response_type)response_type##_init_zero;                                              \
++        encode_response->funcs.encode =                                                            \
++            zmk_rpc_custom_subsystem_encode_response_##_subsystem_identifier;                      \
++        encode_response->arg =                                                                     \
++            ++zmk_rpc_custom_subsystem_response_buffer_seq_##_subsystem_identifier;                \
++        return &zmk_rpc_custom_subsystem_response_buffer_##_subsystem_identifier;                  \
++    }
++
++/**
++ * Helper macro to allocate response buffer for custom subsystems.
++ * @param _subsystem_identifier Unique identifier string for the custom subsystem.
++ * @param encode_response Pointer to pb_callback_t to be set for encoding response.
++ *                        custom_subsystem_handler#encode_response should be passed here.
++ * @return Pointer to allocated response buffer of appropriate type.
++ * @note ZMK_RPC_CUSTOM_SUBSYSTEM_RESPONSE_BUFFER(_subsystem_identifier, response_type) is required
++ * before using this macro.
++ */
++#define ZMK_RPC_CUSTOM_SUBSYSTEM_RESPONSE_BUFFER_ALLOCATE(_subsystem_identifier, encode_response)  \
++    zmk_rpc_custom_subsystem_response_buffer_allocate_##_subsystem_identifier(encode_response)
+diff --git a/app/src/studio/CMakeLists.txt b/app/src/studio/CMakeLists.txt
+index a8417dd..3a5f020 100644
+--- a/app/src/studio/CMakeLists.txt
++++ b/app/src/studio/CMakeLists.txt
+@@ -6,6 +6,7 @@ zephyr_linker_sources(SECTIONS ../../include/linker/zmk-rpc-subsystem-handlers.l
+ zephyr_linker_sources(SECTIONS ../../include/linker/zmk-rpc-subsystem-settings-reset.ld)
+ zephyr_linker_sources(SECTIONS ../../include/linker/zmk-rpc-event-mappers.ld)
+ zephyr_linker_sources(SECTIONS ../../include/linker/zmk-rpc-transport.ld)
++zephyr_linker_sources(SECTIONS ../../include/linker/zmk-rpc-custom-subsystems.ld)
+ 
+ target_sources(app PRIVATE msg_framing.c)
+ target_sources(app PRIVATE rpc.c)
+@@ -13,5 +14,6 @@ target_sources(app PRIVATE core.c)
+ target_sources(app PRIVATE behavior_subsystem.c)
+ target_sources(app PRIVATE core_subsystem.c)
+ target_sources(app PRIVATE keymap_subsystem.c)
++target_sources(app PRIVATE custom_subsystem.c)
+ target_sources_ifdef(CONFIG_ZMK_STUDIO_TRANSPORT_UART app PRIVATE uart_rpc_transport.c)
+ target_sources_ifdef(CONFIG_ZMK_STUDIO_TRANSPORT_BLE app PRIVATE gatt_rpc_transport.c)
+\ No newline at end of file
+diff --git a/app/src/studio/custom_subsystem.c b/app/src/studio/custom_subsystem.c
+new file mode 100644
+index 0000000..b209640
+--- /dev/null
++++ b/app/src/studio/custom_subsystem.c
+@@ -0,0 +1,153 @@
++/*
++ * Copyright (c) 2026 The ZMK Contributors
++ *
++ * SPDX-License-Identifier: MIT
++ */
++
++#include <zephyr/logging/log.h>
++LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
++
++#include <string.h>
++#include <zmk/studio/rpc.h>
++#include <zmk/studio/custom.h>
++#include <pb_encode.h>
++
++ZMK_RPC_SUBSYSTEM(custom)
++
++#define CUSTOM_RESPONSE(type, ...) ZMK_RPC_RESPONSE(custom, type, __VA_ARGS__)
++
++ZMK_EVENT_IMPL(zmk_studio_custom_notification);
++
++bool zmk_rpc_custom_subsystem_encode_response_payload(pb_ostream_t *stream,
++                                                      const pb_field_t *payload_field,
++                                                      const pb_msgdesc_t *custom_response_msgdesc,
++                                                      void const *custom_response) {
++    if (!pb_encode_tag_for_field(stream, payload_field)) {
++        return false;
++    }
++
++    size_t size;
++    if (!pb_get_encoded_size(&size, custom_response_msgdesc, custom_response)) {
++        LOG_WRN("Failed to get encoded size for custom response");
++        return false;
++    }
++
++    LOG_DBG("Encoding custom response of size %d", (int)size);
++
++    if (!pb_encode_varint(stream, size)) {
++        return false;
++    }
++
++    return pb_encode(stream, custom_response_msgdesc, custom_response);
++}
++
++static bool list_custom_subsystems_encode_ui_urls(pb_ostream_t *stream, const pb_field_t *field,
++                                                  void *const *arg) {
++    const struct zmk_rpc_custom_subsystem_meta *meta = (struct zmk_rpc_custom_subsystem_meta *)*arg;
++    for (size_t i = 0; i < meta->ui_urls_count; i++) {
++        if (!pb_encode_tag_for_field(stream, field)) {
++            return false;
++        }
++        if (!pb_encode_string(stream, meta->ui_urls[i], strlen(meta->ui_urls[i]))) {
++            return false;
++        }
++    }
++    return true;
++}
++
++static bool list_custom_subsystems_encode_subsystems(pb_ostream_t *stream, const pb_field_t *field,
++                                                     void *const *arg) {
++    size_t subsystem_count;
++    STRUCT_SECTION_COUNT(zmk_rpc_custom_subsystem, &subsystem_count);
++
++    for (size_t i = 0; i < subsystem_count; i++) {
++        struct zmk_rpc_custom_subsystem *custom_subsys;
++        STRUCT_SECTION_GET(zmk_rpc_custom_subsystem, i, &custom_subsys);
++        zmk_custom_CustomSubsystemInfo subsystem_info = zmk_custom_CustomSubsystemInfo_init_zero;
++        subsystem_info.index = i;
++        strncpy(subsystem_info.identifier, custom_subsys->identifier,
++                CONFIG_ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_IDENTIFIER_MAX_LEN);
++        subsystem_info.ui_url.funcs.encode = list_custom_subsystems_encode_ui_urls;
++        subsystem_info.ui_url.arg = (void *)custom_subsys->meta;
++        if (!pb_encode_tag_for_field(stream, field)) {
++            return false;
++        }
++        if (!pb_encode_submessage(stream, &zmk_custom_CustomSubsystemInfo_msg, &subsystem_info)) {
++            return false;
++        }
++    }
++    return true;
++}
++
++static zmk_studio_Response list_custom_subsystems(const zmk_studio_Request *req) {
++    LOG_DBG("");
++    zmk_custom_ListCustomSubsystemResponse result =
++        zmk_custom_ListCustomSubsystemResponse_init_zero;
++    result.subsystems.funcs.encode = list_custom_subsystems_encode_subsystems;
++    return CUSTOM_RESPONSE(list_custom_subsystems, result);
++}
++
++static zmk_studio_Response call(const zmk_studio_Request *req) {
++    const zmk_custom_CallRequest *request = &req->subsystem.custom.request_type.call;
++    { // validate service index
++        size_t subsystem_count;
++        STRUCT_SECTION_COUNT(zmk_rpc_custom_subsystem, &subsystem_count);
++        if (request->subsystem_index >= subsystem_count) {
++            LOG_ERR("Invalid subsystem index: %d", request->subsystem_index);
++            return ZMK_RPC_RESPONSE(meta, simple_error, zmk_meta_ErrorConditions_RPC_NOT_FOUND);
++        }
++    }
++    struct zmk_rpc_custom_subsystem *custom_subsys;
++    STRUCT_SECTION_GET(zmk_rpc_custom_subsystem, request->subsystem_index, &custom_subsys);
++    if (custom_subsys->meta->security == ZMK_STUDIO_RPC_HANDLER_SECURED &&
++        zmk_studio_core_get_lock_state() != ZMK_STUDIO_CORE_LOCK_STATE_UNLOCKED) {
++        return ZMK_RPC_RESPONSE(meta, simple_error, zmk_meta_ErrorConditions_UNLOCK_REQUIRED);
++    }
++    custom_subsystem_handler *handler = custom_subsys->handler;
++    if (handler) {
++        zmk_custom_CallResponse response = zmk_custom_CallResponse_init_zero;
++        if (handler(request, &response.payload)) {
++            response.subsystem_index = request->subsystem_index;
++            return CUSTOM_RESPONSE(call, response);
++        }
++        return ZMK_RPC_RESPONSE(meta, simple_error, zmk_meta_ErrorConditions_GENERIC);
++    } else {
++        LOG_DBG("No handler for custom subsystem %s", custom_subsys->identifier);
++        return ZMK_RPC_RESPONSE(meta, simple_error, zmk_meta_ErrorConditions_RPC_NOT_FOUND);
++    }
++}
++
++ZMK_RPC_SUBSYSTEM_HANDLER(custom, list_custom_subsystems, ZMK_STUDIO_RPC_HANDLER_UNSECURED);
++ZMK_RPC_SUBSYSTEM_HANDLER(custom, call, ZMK_STUDIO_RPC_HANDLER_UNSECURED);
++
++static int custom_event_mapper(const zmk_event_t *eh, zmk_studio_Notification *n) {
++    struct zmk_studio_custom_notification *custom_ev = as_zmk_studio_custom_notification(eh);
++    if (!custom_ev) {
++        return -ENOTSUP;
++    }
++    zmk_custom_CustomNotification data = zmk_custom_CustomNotification_init_zero;
++    data.subsystem_index = custom_ev->subsystem_index;
++    data.payload = custom_ev->encode_payload;
++    *n = ZMK_RPC_NOTIFICATION(custom, custom_notification, data);
++    return 0;
++}
++
++ZMK_RPC_EVENT_MAPPER(custom, custom_event_mapper, zmk_studio_custom_notification);
++
++#ifdef CONFIG_ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_PRINT_LIST_ON_START
++#include <zephyr/init.h>
++static int custom_subsystem_init() {
++    size_t subsystem_count;
++    STRUCT_SECTION_COUNT(zmk_rpc_custom_subsystem, &subsystem_count);
++    LOG_DBG("Registered Custom Subsystems (%d):", subsystem_count);
++    for (size_t i = 0; i < subsystem_count; i++) {
++        struct zmk_rpc_custom_subsystem *custom_subsys;
++        STRUCT_SECTION_GET(zmk_rpc_custom_subsystem, i, &custom_subsys);
++        LOG_DBG("  [%d] Identifier: %s, Security: %s", i, custom_subsys->identifier,
++                custom_subsys->meta->security == ZMK_STUDIO_RPC_HANDLER_SECURED ? "Secured"
++                                                                                : "Unsecured");
++    }
++    return 0;
++}
++SYS_INIT(custom_subsystem_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
++#endif
+diff --git a/app/src/studio/rpc.c b/app/src/studio/rpc.c
+index 7b8dd60..c0412e6 100644
+--- a/app/src/studio/rpc.c
++++ b/app/src/studio/rpc.c
+@@ -87,7 +87,7 @@ static bool rpc_read_cb(pb_istream_t *stream, uint8_t *buf, size_t count) {
+ 
+     do {
+         uint8_t *buffer;
+-        uint32_t len = ring_buf_get_claim(&rpc_rx_buf, &buffer, count);
++        uint32_t len = ring_buf_get_claim(&rpc_rx_buf, &buffer, count - write_offset);
+ 
+         if (len > 0) {
+             for (int i = 0; i < len; i++) {
+@@ -131,6 +131,7 @@ static bool rpc_tx_buffer_write(pb_ostream_t *stream, const uint8_t *buf, size_t
+         uint32_t claim_len = ring_buf_put_claim(&rpc_tx_buf, &write_buf, count - written);
+ 
+         if (claim_len == 0) {
++            k_sleep(K_MSEC(1));
+             continue;
+         }
+ 
+@@ -177,6 +178,7 @@ static pb_ostream_t pb_ostream_for_tx_buf(void *user_data) {
+ }
+ 
+ static int send_response(const zmk_studio_Response *resp) {
++    int err = 0;
+     k_mutex_lock(&rpc_transport_mutex, K_FOREVER);
+ 
+     if (!selected_transport) {
+@@ -188,7 +190,17 @@ static int send_response(const zmk_studio_Response *resp) {
+     pb_ostream_t stream = pb_ostream_for_tx_buf(user_data);
+ 
+     uint8_t framing_byte = FRAMING_SOF;
+-    ring_buf_put(&rpc_tx_buf, &framing_byte, 1);
++    for (int i = 0;; i++) {
++        if (ring_buf_put(&rpc_tx_buf, &framing_byte, 1) == 1) {
++            break;
++        }
++        if (i > 1000) {
++            LOG_ERR("RPC TX buffer full");
++            err = -ENOMEM;
++            goto exit;
++        }
++        k_sleep(K_MSEC(1));
++    }
+ 
+     selected_transport->tx_notify(&rpc_tx_buf, 1, false, user_data);
+ 
+@@ -198,18 +210,32 @@ static int send_response(const zmk_studio_Response *resp) {
+     if (!status) {
+ #if !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
+         LOG_ERR("Failed to encode the message %s", stream.errmsg);
++#else
++        LOG_ERR("Failed to encode the message");
+ #endif // !IS_ENABLED(CONFIG_NANOPB_NO_ERRMSG)
++        k_mutex_unlock(&rpc_transport_mutex);
+         return -EINVAL;
+     }
+ 
+     framing_byte = FRAMING_EOF;
+-    ring_buf_put(&rpc_tx_buf, &framing_byte, 1);
++    // If response is large, tx buffer can be full for async transport.
++    for (int i = 0;; i++) {
++        if (ring_buf_put(&rpc_tx_buf, &framing_byte, 1) == 1) {
++            break;
++        }
++        if (i > 1000) {
++            LOG_ERR("RPC TX buffer full");
++            err = -ENOMEM;
++            goto exit;
++        }
++        k_sleep(K_MSEC(1));
++    }
+ 
+     selected_transport->tx_notify(&rpc_tx_buf, 1, true, user_data);
+ 
+ exit:
+     k_mutex_unlock(&rpc_transport_mutex);
+-    return 0;
++    return err;
+ }
+ 
+ static void rpc_main(void) {
+--- a/app/src/studio/Kconfig
++++ b/app/src/studio/Kconfig
+@@ -98,3 +98,15 @@
+ endif
+ 
+ endif
++
++if ZMK_STUDIO_RPC
++config ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_PRINT_LIST_ON_START
++    bool
++    default n
++config ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_IDENTIFIER_MAX_LEN
++    int "Custom subsystem identifier length"
++    default 32
++config ZMK_STUDIO_RPC_CUSTOM_SUBSYSTEM_REQUEST_PAYLOAD_MAX_BYTES
++    int "Custom subsystem payload length"
++    default 256
++endif

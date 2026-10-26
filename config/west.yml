@@ -7,10 +7,16 @@ manifest:
   projects:
     - name: zmk
       remote: zmkfirmware
-      revision: v0.3-branch
-      import: app/west.yml
+      revision: acfd8e5ea76cf23ad1c9b6b99848f97a95224257
+      import:
+        file: app/west.yml
+        name-blocklist: [zmk-studio-messages]
+    - name: zmk-studio-messages
+      url: https://github.com/cormoran/zmk-studio-messages
+      revision: 89b81d2e587fce807b668dff2a6967a40beef421
+      path: modules/msgs/zmk-studio-messages
     - name: zmk-pmw3610-driver
       remote: kumamuk-git
-      revision: main
+      revision: 5e04553ab803d24405bd45621a41310ea3050e59
   self:
     path: config

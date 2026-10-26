@@ -1,0 +1,3 @@
+description: Persistent transactional text macro with an ownership token
+compatible: "roba,dynamic-macro"
+include: two_param.yaml

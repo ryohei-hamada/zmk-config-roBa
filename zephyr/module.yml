@@ -1,4 +1,7 @@
-name: roBa
+name: roba-runtime
 build:
+  cmake: modules/roba-runtime
+  kconfig: modules/roba-runtime/Kconfig
   settings:
     board_root: .
+    dts_root: modules/roba-runtime
