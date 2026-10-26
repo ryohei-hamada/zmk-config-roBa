@@ -1,0 +1,4 @@
+config ROBA_RUNTIME_MACROS
+    bool "roBa Studio transactional text macros"
+    default y
+    depends on ZMK_STUDIO && SETTINGS

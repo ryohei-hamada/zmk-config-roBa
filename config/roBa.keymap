@@ -122,3 +122,5 @@
         };
     };
 };
+
+/ { behaviors { rs_dynamic: rs_dynamic { compatible = "roba,dynamic-macro"; #binding-cells = <2>; display-name = "roBa Dynamic Macro v1"; }; }; };
