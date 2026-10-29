@@ -61,7 +61,8 @@
                 &kp Z  &kp X  &kp C  &kp V  &kp SEMICOLON  &trans  &trans  &kp G  &kp D  &kp M  &kp J  &lt 3 B
                 &kp LC(LS(T))  &kp LG(LS(NUMBER_5))  &mkp MB1  &lt 3 TAB  &lt 1 SPACE  &kp AT_SIGN  &kp ENTER  &lt 2 BACKSPACE  &kp CAPSLOCK
             >;
-            sensor-bindings = <&inc_dec_kp PG_UP PAGE_DOWN>;
+            // Left encoder: CW -> F13 (MIDI CC increase), CCW -> F14 (decrease).
+            sensor-bindings = <&inc_dec_kp F13 F14>;
         };
 
         NAV_NUM {
